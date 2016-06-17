@@ -5,7 +5,7 @@ import os
 import codecs
 import re
 import csv
-
+import uuid
 
 def main(args):
     if not os.path.exists(args.file):
@@ -20,24 +20,10 @@ def main(args):
             if line.encode('ascii', 'ignore').strip().startswith('@'):
                 line = line.lstrip()
                 if record:
-                    m = re.search(pattern, record)
-                    if m:
-                        for i, feat in enumerate(m.group(0).split('\r\n')):
-                            feat = feat.strip('{},')
-                            if i == 0:
-                                id = feat.encode('ascii', 'ignore')
-                                records[id] = {}
-                            else:
-                                s = feat.split(' = ')
-                                if len(s) == 2:
-                                    key, value = s[0].encode('ascii', 'ignore'), s[1].encode('ascii', 'ignore')
-                                    if key not in records[id]:
-                                        records[id][key] = value
-                                    else:
-                                        records[id][key] += ',' + value
-                                    columns.add(key)
+                    add_record(columns, pattern, record, records)
                     record = ""
             record += line
+        add_record(columns, pattern, record, records)
 
     with codecs.open(args.output, 'w', encoding='utf-8') as f:
         csvwriter = csv.writer(f, delimiter=str(','))
@@ -52,6 +38,27 @@ def main(args):
                     row.append('')
             csvwriter.writerow(row)
             row = []
+
+
+def add_record(columns, pattern, record, records):
+    m = re.search(pattern, record)
+    if m:
+        for i, feat in enumerate(m.group(0).split('\n')):
+            feat = feat.strip('{},\r')
+            if i == 0:
+                id = feat.encode('ascii', 'ignore')
+                if id in records:
+                    id += '_' + str(uuid.uuid1())
+                records[id] = {}
+            else:
+                s = feat.replace('\r','').split(' = ')
+                if len(s) == 2:
+                    key, value = s[0].encode('ascii', 'ignore'), s[1].encode('ascii', 'ignore')
+                    if key not in records[id]:
+                        records[id][key] = value
+                    else:
+                        records[id][key] += ',' + value
+                    columns.add(key)
 
 
 def parse_args():
